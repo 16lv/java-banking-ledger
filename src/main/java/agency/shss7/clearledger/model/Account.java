@@ -64,14 +64,16 @@ public abstract class Account {
     public abstract String getAccountTypeLabel();
 
     public void deposit(String txId, long amountPence, String note) {
+        requireValidTxId(txId);
         if (amountPence <= 0) {
             throw new IllegalArgumentException("Deposit amount must be positive.");
         }
         this.balancePence += amountPence;
-        recordEntry(txId, TransactionEntry.EntryType.DEPOSIT, amountPence, note);
+        recordEntry(txId, TransactionEntry.EntryType.DEPOSIT, amountPence, normalizeNote(note));
     }
 
     public void withdraw(String txId, long amountPence, String note) {
+        requireValidTxId(txId);
         if (amountPence <= 0) {
             throw new IllegalArgumentException("Withdrawal amount must be positive.");
         }
@@ -84,8 +86,9 @@ public abstract class Account {
             );
         }
 
+        String safeNote = normalizeNote(note);
         this.balancePence -= amountPence;
-        recordEntry(txId, TransactionEntry.EntryType.WITHDRAWAL, amountPence, note);
+        recordEntry(txId, TransactionEntry.EntryType.WITHDRAWAL, amountPence, safeNote);
 
         if (feePence > 0) {
             this.balancePence -= feePence;
@@ -94,16 +97,34 @@ public abstract class Account {
     }
 
     protected final void creditInternal(String txId, TransactionEntry.EntryType type, long amountPence, String note) {
+        requireValidTxId(txId);
+        if (amountPence <= 0) {
+            throw new IllegalArgumentException("Credit amount must be positive.");
+        }
         this.balancePence += amountPence;
-        recordEntry(txId, type, amountPence, note);
+        recordEntry(txId, type, amountPence, normalizeNote(note));
     }
 
     protected final void debitInternal(String txId, TransactionEntry.EntryType type, long amountPence, String note) {
+        requireValidTxId(txId);
+        if (amountPence <= 0) {
+            throw new IllegalArgumentException("Debit amount must be positive.");
+        }
         if (!canWithdraw(amountPence)) {
             throw new IllegalStateException("Insufficient funds on account " + accountId);
         }
         this.balancePence -= amountPence;
-        recordEntry(txId, type, amountPence, note);
+        recordEntry(txId, type, amountPence, normalizeNote(note));
+    }
+
+    private static void requireValidTxId(String txId) {
+        if (txId == null || txId.isBlank()) {
+            throw new IllegalArgumentException("transactionId cannot be blank.");
+        }
+    }
+
+    private static String normalizeNote(String note) {
+        return note == null ? "" : note.trim();
     }
 
     private void recordEntry(String txId, TransactionEntry.EntryType type, long amountPence, String note) {

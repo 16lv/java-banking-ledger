@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import agency.shss7.clearledger.model.CheckingAccount;
 import agency.shss7.clearledger.model.FeePolicy;
 import agency.shss7.clearledger.model.SavingsAccount;
+import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -80,5 +81,19 @@ class LedgerServiceTest {
         assertEquals(175_000L, savings.getBalancePence());
         assertEquals(40_000L, checking.getBalancePence());
         assertEquals(215_000L, ledger.getTotalHoldingsPence());
+    }
+
+    @Test
+    void invalidTxIdDoesNotCorruptBalanceAndBadTransferArgsAreRejected() {
+        assertThrows(IllegalArgumentException.class, () -> checking.deposit("   ", 1_000L, "Invalid"));
+        assertEquals(15_000L, checking.getBalancePence());
+
+        assertThrows(IllegalArgumentException.class, () -> checking.withdraw("", 1_000L, "Invalid"));
+        assertEquals(15_000L, checking.getBalancePence());
+
+        assertThrows(IllegalArgumentException.class, () -> ledger.transfer(null, "CHK-01", 500L, "Null source"));
+        assertThrows(IllegalArgumentException.class, () -> ledger.transfer("SAV-01", "SAV-01", 500L, "Self"));
+        assertThrows(NoSuchElementException.class, () -> ledger.transfer("SAV-01", "MISSING", 500L, "Missing"));
+        assertEquals(200_000L, savings.getBalancePence());
     }
 }

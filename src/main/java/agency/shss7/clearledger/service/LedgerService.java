@@ -48,19 +48,28 @@ public final class LedgerService {
      * crediting the destination account.
      */
     public String transfer(String fromAccountId, String toAccountId, long amountPence, String reference) {
+        if (fromAccountId == null || fromAccountId.isBlank() || toAccountId == null || toAccountId.isBlank()) {
+            throw new IllegalArgumentException("Source and destination account IDs are required.");
+        }
         if (fromAccountId.equals(toAccountId)) {
             throw new IllegalArgumentException("Cannot transfer to the same account.");
         }
         if (amountPence <= 0) {
             throw new IllegalArgumentException("Transfer amount must be positive.");
         }
+        String cleanRef = (reference == null || reference.isBlank()) ? "Account transfer" : reference.trim();
 
         Account source = getAccount(fromAccountId);
         Account target = getAccount(toAccountId);
         String txId = "TX-" + txSequence.incrementAndGet();
 
-        source.withdraw(txId + "-OUT", amountPence, "Transfer to " + toAccountId + ": " + reference);
-        target.deposit(txId + "-IN", amountPence, "Transfer from " + fromAccountId + ": " + reference);
+        source.withdraw(txId + "-OUT", amountPence, "Transfer to " + toAccountId + ": " + cleanRef);
+        try {
+            target.deposit(txId + "-IN", amountPence, "Transfer from " + fromAccountId + ": " + cleanRef);
+        } catch (RuntimeException ex) {
+            source.deposit(txId + "-REV", amountPence, "Reversal of failed transfer to " + toAccountId);
+            throw ex;
+        }
         return txId;
     }
 
@@ -107,7 +116,7 @@ public final class LedgerService {
         ledger.transfer("SAV-01", "CHK-01", 25_000L, "Current account top-up");
         ledger.runMonthlyInterestCycle();
 
-        System.out.println("=== CLEARLEDGER ACCOUNT & STATEMENT SUMMARY ===");
+        System.out.println("=== JAVA BANKING LEDGER: ACCOUNT & STATEMENT SUMMARY ===");
         for (Account acc : ledger.listAccounts()) {
             System.out.printf(
                 "%s [%s] Owner: %s | Closing Balance: %s%n",
