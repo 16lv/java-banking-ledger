@@ -1,5 +1,7 @@
 package agency.shss7.clearledger.model;
 
+import java.math.BigInteger;
+
 /**
  * Day-to-day current account that supports an agreed overdraft limit in pence.
  */
@@ -26,8 +28,12 @@ public final class CheckingAccount extends Account {
 
     @Override
     protected boolean canWithdraw(long totalDeductionPence) {
-        // Allowed to go negative down to -overdraftLimitPence
-        return (getBalancePence() - totalDeductionPence) >= -overdraftLimitPence;
+        if (totalDeductionPence < 0) {
+            return false;
+        }
+        return BigInteger.valueOf(getBalancePence())
+            .subtract(BigInteger.valueOf(totalDeductionPence))
+            .compareTo(BigInteger.valueOf(-overdraftLimitPence)) >= 0;
     }
 
     @Override

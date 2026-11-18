@@ -1,5 +1,7 @@
 package agency.shss7.clearledger.model;
 
+import java.math.BigInteger;
+
 /**
  * Interest-bearing savings account.
  * Cannot go into overdraft and enforces a minimum reserve balance in pence.
@@ -36,20 +38,27 @@ public final class SavingsAccount extends Account {
 
     @Override
     protected boolean canWithdraw(long totalDeductionPence) {
-        return (getBalancePence() - totalDeductionPence) >= minimumReservePence;
+        if (totalDeductionPence < 0) {
+            return false;
+        }
+        return BigInteger.valueOf(getBalancePence())
+            .subtract(BigInteger.valueOf(totalDeductionPence))
+            .compareTo(BigInteger.valueOf(minimumReservePence)) >= 0;
     }
 
     /**
      * Applies one month of simple interest based on the account's annual basis points
-     * (100 bps = 1.00% per year).
+     * (100 bps = 1.00% per year) without signed 64-bit multiplication overflow.
      */
     public long applyMonthlyInterest(String txId) {
         long currentBalance = getBalancePence();
         if (currentBalance <= 0 || annualBasisPoints == 0) {
             return 0L;
         }
-        // Integer division rounds down to the nearest penny
-        long interestPence = (currentBalance * annualBasisPoints) / (10_000L * 12L);
+        long interestPence = BigInteger.valueOf(currentBalance)
+            .multiply(BigInteger.valueOf(annualBasisPoints))
+            .divide(BigInteger.valueOf(120_000L))
+            .longValueExact();
         if (interestPence > 0) {
             creditInternal(
                 txId,

@@ -63,11 +63,13 @@ public final class LedgerService {
         Account target = getAccount(toAccountId);
         String txId = "TX-" + txSequence.incrementAndGet();
 
+        long balanceBeforeDebit = source.getBalancePence();
         source.withdraw(txId + "-OUT", amountPence, "Transfer to " + toAccountId + ": " + cleanRef);
+        long totalDebited = Math.subtractExact(balanceBeforeDebit, source.getBalancePence());
         try {
             target.deposit(txId + "-IN", amountPence, "Transfer from " + fromAccountId + ": " + cleanRef);
         } catch (RuntimeException ex) {
-            source.deposit(txId + "-REV", amountPence, "Reversal of failed transfer to " + toAccountId);
+            source.deposit(txId + "-REV", totalDebited, "Reversal of failed transfer to " + toAccountId);
             throw ex;
         }
         return txId;
@@ -103,10 +105,10 @@ public final class LedgerService {
     public static void main(String[] args) {
         LedgerService ledger = new LedgerService();
         CheckingAccount checking = new CheckingAccount(
-            "CHK-01", "Sheikh S.", 15_000L, 5_000L, FeePolicy.flatFee(25L)
+            "CHK-01", "Jordan Taylor", 15_000L, 5_000L, FeePolicy.flatFee(25L)
         );
         SavingsAccount savings = new SavingsAccount(
-            "SAV-01", "Sheikh S.", 200_000L, 480, 10_000L
+            "SAV-01", "Jordan Taylor", 200_000L, 480, 10_000L
         );
 
         ledger.registerAccount(checking);

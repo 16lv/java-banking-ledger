@@ -68,7 +68,7 @@ public abstract class Account {
         if (amountPence <= 0) {
             throw new IllegalArgumentException("Deposit amount must be positive.");
         }
-        this.balancePence += amountPence;
+        this.balancePence = Math.addExact(this.balancePence, amountPence);
         recordEntry(txId, TransactionEntry.EntryType.DEPOSIT, amountPence, normalizeNote(note));
     }
 
@@ -78,7 +78,15 @@ public abstract class Account {
             throw new IllegalArgumentException("Withdrawal amount must be positive.");
         }
         long feePence = feePolicy.calculateFeePence(amountPence);
-        long totalDeduction = amountPence + feePence;
+        if (feePence < 0) {
+            throw new IllegalStateException("FeePolicy cannot return a negative fee: " + feePence);
+        }
+        long totalDeduction;
+        try {
+            totalDeduction = Math.addExact(amountPence, feePence);
+        } catch (ArithmeticException ex) {
+            throw new IllegalStateException("Withdrawal plus fee overflows 64-bit integer bounds.", ex);
+        }
 
         if (!canWithdraw(totalDeduction)) {
             throw new IllegalStateException(
@@ -87,11 +95,11 @@ public abstract class Account {
         }
 
         String safeNote = normalizeNote(note);
-        this.balancePence -= amountPence;
+        this.balancePence = Math.subtractExact(this.balancePence, amountPence);
         recordEntry(txId, TransactionEntry.EntryType.WITHDRAWAL, amountPence, safeNote);
 
         if (feePence > 0) {
-            this.balancePence -= feePence;
+            this.balancePence = Math.subtractExact(this.balancePence, feePence);
             recordEntry(txId + "-FEE", TransactionEntry.EntryType.FEE, feePence, "Withdrawal fee");
         }
     }
@@ -101,7 +109,7 @@ public abstract class Account {
         if (amountPence <= 0) {
             throw new IllegalArgumentException("Credit amount must be positive.");
         }
-        this.balancePence += amountPence;
+        this.balancePence = Math.addExact(this.balancePence, amountPence);
         recordEntry(txId, type, amountPence, normalizeNote(note));
     }
 
@@ -113,7 +121,7 @@ public abstract class Account {
         if (!canWithdraw(amountPence)) {
             throw new IllegalStateException("Insufficient funds on account " + accountId);
         }
-        this.balancePence -= amountPence;
+        this.balancePence = Math.subtractExact(this.balancePence, amountPence);
         recordEntry(txId, type, amountPence, normalizeNote(note));
     }
 

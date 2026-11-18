@@ -1,12 +1,12 @@
 # java-banking-ledger
 
-Object-oriented account, withdrawal fee strategy, and transfer engine written in **Java 21**. Monetary values use signed `long` minor units (pence) throughout to avoid binary floating-point rounding drift.
+Object-oriented account, withdrawal fee strategy, and transfer engine written in **Java 21**. Monetary values use signed `long` minor units (pence) with `BigInteger` intermediate arithmetic where products could otherwise overflow 64 bits.
 
 ## Architecture
 
-- **Account hierarchy (`Account`, `CheckingAccount`, `SavingsAccount`)**: Abstract base class validates transaction IDs and positive amounts before mutating balances, delegates withdrawal eligibility via `canWithdraw()`, and records immutable `TransactionEntry` records on every credit, debit, fee, or interest payout.
-- **Composable fee policies (`FeePolicy`)**: Functional strategy interface supporting zero-fee, flat-fee, and tiered basis-point fee calculation above a free threshold.
-- **Transfer coordinator (`LedgerService`)**: Validates source/destination accounts upfront, debits and credits across accounts, and calculates monthly interest payouts across `SavingsAccount` instances using Java 21 pattern matching.
+- **Account hierarchy (`Account`, `CheckingAccount`, `SavingsAccount`)**: Abstract base class validates transaction IDs and positive amounts, uses exact `Math.addExact` / `Math.subtractExact` arithmetic, guards against signed long underflow on withdrawals, and appends immutable `TransactionEntry` records to an unmodifiable statement.
+- **Composable fee policies (`FeePolicy`)**: Functional strategy interface supporting zero-fee, flat-fee, and overflow-safe tiered basis-point fees above a free allowance.
+- **Transfer coordinator (`LedgerService`)**: Debits source account upfront, credits destination atomically with full principal-plus-fee reversal if the credit fails, and applies monthly `SavingsAccount` interest payouts via Java 21 pattern matching.
 
 ## Structure
 

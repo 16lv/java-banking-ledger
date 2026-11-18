@@ -1,9 +1,9 @@
 package agency.shss7.clearledger.model;
 
+import java.math.BigInteger;
+
 /**
  * Strategy interface for calculating per-withdrawal fees.
- * Lets us swap out fee rules (e.g. student accounts vs standard accounts)
- * without hardcoding if/else chains inside Account subclasses.
  */
 @FunctionalInterface
 public interface FeePolicy {
@@ -22,7 +22,7 @@ public interface FeePolicy {
 
     /**
      * Charges a basis-point fee (100 bps = 1.00%) only on the portion of a withdrawal
-     * above freeThresholdPence.
+     * above freeThresholdPence, avoiding signed 64-bit multiplication overflow.
      */
     static FeePolicy tieredFee(long freeThresholdPence, int rateBasisPoints) {
         if (freeThresholdPence < 0 || rateBasisPoints < 0) {
@@ -33,7 +33,10 @@ public interface FeePolicy {
                 return 0L;
             }
             long taxablePence = amount - freeThresholdPence;
-            return (taxablePence * rateBasisPoints) / 10_000L;
+            return BigInteger.valueOf(taxablePence)
+                .multiply(BigInteger.valueOf(rateBasisPoints))
+                .divide(BigInteger.valueOf(10_000L))
+                .longValueExact();
         };
     }
 }

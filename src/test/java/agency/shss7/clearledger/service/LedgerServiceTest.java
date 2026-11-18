@@ -20,9 +20,9 @@ class LedgerServiceTest {
     void setUp() {
         ledger = new LedgerService();
         // £150.00 opening balance, £50.00 overdraft limit, £0.25 flat withdrawal fee
-        checking = new CheckingAccount("CHK-01", "Sheikh S.", 15_000L, 5_000L, FeePolicy.flatFee(25L));
+        checking = new CheckingAccount("CHK-01", "Jordan Taylor", 15_000L, 5_000L, FeePolicy.flatFee(25L));
         // £2000.00 opening balance, 4.80% annual interest (480 bps), £100.00 minimum reserve
-        savings = new SavingsAccount("SAV-01", "Sheikh S.", 200_000L, 480, 10_000L);
+        savings = new SavingsAccount("SAV-01", "Jordan Taylor", 200_000L, 480, 10_000L);
 
         ledger.registerAccount(checking);
         ledger.registerAccount(savings);
@@ -95,5 +95,34 @@ class LedgerServiceTest {
         assertThrows(IllegalArgumentException.class, () -> ledger.transfer("SAV-01", "SAV-01", 500L, "Self"));
         assertThrows(NoSuchElementException.class, () -> ledger.transfer("SAV-01", "MISSING", 500L, "Missing"));
         assertEquals(200_000L, savings.getBalancePence());
+    }
+
+    @Test
+    void overflowSafeCheckingUnderflowAndLargeInterestAndCompensatingFeeRollback() {
+        // Long.MAX_VALUE withdrawal must fail cleanly instead of underflowing into overdraft
+        assertThrows(
+            IllegalStateException.class,
+            () -> checking.withdraw("W-OVERFLOW", Long.MAX_VALUE, "Huge amount")
+        );
+
+        // Large savings balance should compute monthly interest safely without intermediate long overflow
+        SavingsAccount largeSavings = new SavingsAccount("SAV-BIG", "Morgan", 1_000_000_000_000_000L, 480, 0L);
+        long bigInterest = largeSavings.applyMonthlyInterest("INT-BIG");
+        assertEquals(4_000_000_000_000L, bigInterest);
+
+        // Negative FeePolicy must be rejected safely before debiting
+        CheckingAccount brokenFeeAcct = new CheckingAccount("CHK-BAD", "Morgan", 10_000L, 0L, amt -> -10L);
+        assertThrows(IllegalStateException.class, () -> brokenFeeAcct.withdraw("W-NEG", 500L, "Invalid policy"));
+        assertEquals(10_000L, brokenFeeAcct.getBalancePence());
+
+        // Transfer failing on destination deposit due to Long.MAX_VALUE balance refunds principal AND fee
+        CheckingAccount cappedTarget = new CheckingAccount("CHK-MAX", "Target", Long.MAX_VALUE - 500L, 0L, FeePolicy.zeroFee());
+        ledger.registerAccount(cappedTarget);
+        long checkingBefore = checking.getBalancePence();
+        assertThrows(
+            ArithmeticException.class,
+            () -> ledger.transfer("CHK-01", "CHK-MAX", 2_000L, "Will overflow target")
+        );
+        assertEquals(checkingBefore, checking.getBalancePence());
     }
 }
