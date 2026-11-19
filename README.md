@@ -1,14 +1,40 @@
 # java-banking-ledger
 
-Object-oriented account, withdrawal fee strategy, and transfer engine written in **Java 21**. Monetary values use signed `long` minor units (pence) with `BigInteger` intermediate arithmetic where products could otherwise overflow 64 bits.
+Deterministic banking domain ledger written in **Java 21** using integer-pence accounting, Strategy-pattern fee rules, overflow-safe arithmetic, and an immutable transaction trail.
 
-## Architecture
+## Overview
 
-- **Account hierarchy (`Account`, `CheckingAccount`, `SavingsAccount`)**: Abstract base class validates transaction IDs and positive amounts, uses exact `Math.addExact` / `Math.subtractExact` arithmetic, guards against signed long underflow on withdrawals, and appends immutable `TransactionEntry` records to an unmodifiable statement.
-- **Composable fee policies (`FeePolicy`)**: Functional strategy interface supporting zero-fee, flat-fee, and overflow-safe tiered basis-point fees above a free allowance.
-- **Transfer coordinator (`LedgerService`)**: Debits source account upfront, credits destination atomically with full principal-plus-fee reversal if the credit fails, and applies monthly `SavingsAccount` interest payouts via Java 21 pattern matching.
+`java-banking-ledger` avoids IEEE 754 floating-point drift by storing all balances and fees in whole pence (`long`), guarding arithmetic with `Math.addExact`/`Math.subtractExact` and `BigInteger` intermediate math.
 
-## Structure
+## Features
+
+- **Account subtypes**: Abstract `Account` base class extended by `CheckingAccount` (configurable overdraft limit) and `SavingsAccount` (minimum reserve balance + basis-point monthly interest accrual).
+- **Composable fee rules**: Functional `FeePolicy` interface with `zeroFee()`, `flatFee()`, and `tieredFee()` (exempt below threshold, basis-point rate on excess).
+- **Overflow-safe money math**: Guards balance additions, subtractions, percentage fees, and aggregate holdings against silent 64-bit signed overflow/underflow.
+- **Compensating transfer rollback**: `LedgerService.transfer()` captures total debited principal + withdrawal fee and reverses the full amount if crediting the destination fails.
+- **Immutable statements**: `getStatement()` returns an unmodifiable view of `TransactionEntry` records carrying running `balanceAfterPence` checkpoints.
+
+## Technology Stack
+
+- Java 21 LTS
+- Maven 3.9+
+- JUnit 5 (Jupiter)
+
+## Build & Run
+
+Compile, run the CLI ledger walkthrough, and run tests:
+
+```bash
+mvn -B test
+mvn -B -q compile exec:java -Dexec.mainClass="agency.shss7.clearledger.service.LedgerService"
+```
+
+## Technical Implementation Details
+
+- Monthly savings interest converts `(balancePence * annualRateBps) / 120_000` via `BigInteger` before converting back with `longValueExact()`, keeping precision for arbitrarily large balances.
+- `LedgerService.transfer()` computes `balanceBeforeDebit - source.getBalancePence()` after withdrawal so rolled-back transfers restore both principal and any tiered/flat fee charged.
+
+## Project Structure
 
 ```text
 java-banking-ledger/
@@ -16,19 +42,23 @@ java-banking-ledger/
 │   ├── model/
 │   │   ├── Account.java
 │   │   ├── CheckingAccount.java
-│   │   ├── SavingsAccount.java
 │   │   ├── FeePolicy.java
+│   │   ├── SavingsAccount.java
 │   │   └── TransactionEntry.java
 │   └── service/
 │       └── LedgerService.java
-└── src/test/java/agency/shss7/clearledger/service/
-    └── LedgerServiceTest.java
+├── src/test/java/agency/shss7/clearledger/service/
+│   └── LedgerServiceTest.java
+└── pom.xml
 ```
 
-## Build & Run
+## Testing
 
 ```bash
-mvn test
-mvn -q package
-java -jar target/clearledger-1.0.0.jar
+mvn -B test
 ```
+
+## Known Limitations & Future Improvements
+
+- Account storage lives in an in-memory `LinkedHashMap` with no persistence backend or row-level concurrency locks; adding JDBC/PostgreSQL persistence with `SERIALIZABLE` / optimistic locking would adapt it cleanly for multi-threaded services.
+- Supports GBP pence only (`long`); multi-currency transfers would pair `long` minor units with explicit currency codes.

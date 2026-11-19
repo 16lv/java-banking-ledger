@@ -84,16 +84,21 @@ public final class LedgerService {
         for (Account account : accounts.values()) {
             if (account instanceof SavingsAccount savings) {
                 String txId = "INT-" + txSequence.incrementAndGet();
-                totalInterestPaidPence += savings.applyMonthlyInterest(txId);
+                totalInterestPaidPence = Math.addExact(
+                    totalInterestPaidPence,
+                    savings.applyMonthlyInterest(txId)
+                );
             }
         }
         return totalInterestPaidPence;
     }
 
     public long getTotalHoldingsPence() {
-        return accounts.values().stream()
-            .mapToLong(Account::getBalancePence)
-            .sum();
+        long total = 0L;
+        for (Account account : accounts.values()) {
+            total = Math.addExact(total, account.getBalancePence());
+        }
+        return total;
     }
 
     private static String formatGbp(long pence) {
