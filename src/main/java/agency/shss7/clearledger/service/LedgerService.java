@@ -101,6 +101,35 @@ public final class LedgerService {
         return total;
     }
 
+    /**
+     * Exports an account's immutable statement ledger as RFC 4180-compatible CSV text.
+     */
+    public String exportStatementCsv(String accountId) {
+        Account account = getAccount(accountId);
+        StringBuilder csv = new StringBuilder();
+        csv.append("transaction_id,account_id,type,amount_pence,balance_after_pence,description,timestamp\n");
+        for (TransactionEntry entry : account.getStatement()) {
+            csv.append(escapeCsv(entry.transactionId())).append(',')
+                .append(escapeCsv(entry.accountId())).append(',')
+                .append(entry.type().name()).append(',')
+                .append(entry.amountPence()).append(',')
+                .append(entry.balanceAfterPence()).append(',')
+                .append(escapeCsv(entry.description())).append(',')
+                .append(entry.timestamp()).append('\n');
+        }
+        return csv.toString();
+    }
+
+    private static String escapeCsv(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.indexOf(',') >= 0 || value.indexOf('"') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+            return '"' + value.replace("\"", "\"\"") + '"';
+        }
+        return value;
+    }
+
     private static String formatGbp(long pence) {
         long abs = Math.abs(pence);
         String sign = pence < 0 ? "-" : "";

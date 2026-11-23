@@ -125,4 +125,15 @@ class LedgerServiceTest {
         );
         assertEquals(checkingBefore, checking.getBalancePence());
     }
+
+    @Test
+    void exportStatementCsvFormatsRowsEscapesCommasAndRejectsUnknownAccount() {
+        ledger.transfer("CHK-01", "SAV-01", 2_500L, "Rent, \"Flat 4\"");
+        String csv = ledger.exportStatementCsv("CHK-01");
+        String[] lines = csv.stripTrailing().split("\n");
+        assertTrue(lines[0].equals("transaction_id,account_id,type,amount_pence,balance_after_pence,description,timestamp"));
+        assertTrue(csv.contains(",WITHDRAWAL,2500,"));
+        assertTrue(csv.contains("\"Transfer to SAV-01: Rent, \"\"Flat 4\"\"\""));
+        assertThrows(NoSuchElementException.class, () -> ledger.exportStatementCsv("MISSING-99"));
+    }
 }

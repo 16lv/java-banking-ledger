@@ -113,18 +113,6 @@ public abstract class Account {
         recordEntry(txId, type, amountPence, normalizeNote(note));
     }
 
-    protected final void debitInternal(String txId, TransactionEntry.EntryType type, long amountPence, String note) {
-        requireValidTxId(txId);
-        if (amountPence <= 0) {
-            throw new IllegalArgumentException("Debit amount must be positive.");
-        }
-        if (!canWithdraw(amountPence)) {
-            throw new IllegalStateException("Insufficient funds on account " + accountId);
-        }
-        this.balancePence = Math.subtractExact(this.balancePence, amountPence);
-        recordEntry(txId, type, amountPence, normalizeNote(note));
-    }
-
     private static void requireValidTxId(String txId) {
         if (txId == null || txId.isBlank()) {
             throw new IllegalArgumentException("transactionId cannot be blank.");
