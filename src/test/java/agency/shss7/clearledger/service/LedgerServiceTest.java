@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import agency.shss7.clearledger.model.CheckingAccount;
 import agency.shss7.clearledger.model.FeePolicy;
 import agency.shss7.clearledger.model.SavingsAccount;
+import agency.shss7.clearledger.model.TransactionEntry;
 import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,5 +136,17 @@ class LedgerServiceTest {
         assertTrue(csv.contains(",WITHDRAWAL,2500,"));
         assertTrue(csv.contains("\"Transfer to SAV-01: Rent, \"\"Flat 4\"\"\""));
         assertThrows(NoSuchElementException.class, () -> ledger.exportStatementCsv("MISSING-99"));
+    }
+
+    @Test
+    void statementFilteringAndFeeTotalsReflectRecordedEntries() {
+        checking.withdraw("W-FEE-1", 1_000L, "ATM withdrawal");
+        checking.withdraw("W-FEE-2", 2_000L, "Wire payout");
+        ledger.runMonthlyInterestCycle();
+
+        assertEquals(2, ledger.getStatementByType("CHK-01", TransactionEntry.EntryType.FEE).size());
+        assertEquals(50L, ledger.getTotalFeesChargedPence("CHK-01"));
+        assertEquals(1, ledger.getStatementByType("SAV-01", TransactionEntry.EntryType.INTEREST).size());
+        assertThrows(NullPointerException.class, () -> ledger.getStatementByType("CHK-01", null));
     }
 }

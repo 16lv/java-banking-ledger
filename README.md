@@ -12,7 +12,7 @@ Deterministic banking domain ledger written in **Java 21** using integer-pence a
 - **Composable fee rules**: Functional `FeePolicy` interface with `zeroFee()`, `flatFee()`, and `tieredFee()` (exempt below threshold, basis-point rate on excess).
 - **Overflow-safe money math**: Guards balance additions, subtractions, percentage fees, and aggregate holdings against silent 64-bit signed overflow/underflow.
 - **Compensating transfer rollback**: `LedgerService.transfer()` captures total debited principal + withdrawal fee and reverses the full amount if crediting the destination fails.
-- **Immutable statements & CSV export**: `getStatement()` returns an unmodifiable view of `TransactionEntry` records carrying running `balanceAfterPence` checkpoints, and `exportStatementCsv()` serialises an account's history with RFC 4180 field escaping.
+- **Immutable statements & CSV export**: `getStatement()` returns an unmodifiable view of `TransactionEntry` records carrying running `balanceAfterPence` checkpoints, `getStatementByType()` / `getTotalFeesChargedPence()` aggregate filtered ledger history, and `exportStatementCsv()` serialises an account's history with RFC 4180 field escaping.
 
 ## Technology Stack
 

@@ -8,8 +8,10 @@ import agency.shss7.clearledger.model.TransactionEntry;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -99,6 +101,26 @@ public final class LedgerService {
             total = Math.addExact(total, account.getBalancePence());
         }
         return total;
+    }
+
+    public List<TransactionEntry> getStatementByType(
+        String accountId,
+        TransactionEntry.EntryType entryType
+    ) {
+        Objects.requireNonNull(entryType, "entryType cannot be null.");
+        Account account = getAccount(accountId);
+        return account.getStatement()
+            .stream()
+            .filter(entry -> entry.type() == entryType)
+            .toList();
+    }
+
+    public long getTotalFeesChargedPence(String accountId) {
+        long totalFees = 0L;
+        for (TransactionEntry entry : getStatementByType(accountId, TransactionEntry.EntryType.FEE)) {
+            totalFees = Math.addExact(totalFees, entry.amountPence());
+        }
+        return totalFees;
     }
 
     /**
